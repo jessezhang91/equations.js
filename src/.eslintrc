@@ -1,0 +1,33 @@
+{
+	"env": {
+		"browser": true,
+		"node": true,
+		"es6": true
+	},
+	"globals": {
+		
+	},
+	"rules": {
+		"comma-dangle": [1, "never"],
+		"eol-last": 1,
+		"no-use-before-define": [2, "nofunc"],
+		"no-underscore-dangle": 1,
+		"no-extra-boolean-cast": 0,
+		"eqeqeq": [2, "smart"],
+		"no-console": 2,
+		"no-shadow": 1,
+		"quotes": [1, "double", "avoid-escape"],
+		"new-cap": [1, {"newIsCap": true, "capIsNew": false}],
+		"dot-notation": 1,
+		"camelcase": 1,
+		"valid-jsdoc": 1,
+		"handle-callback-err": 1,
+
+		"no-var": 1,
+		"generator-star-spacing": [2, "after"],
+		"object-shorthand": 1
+	},
+	"ecmaFeatures": {
+		"modules": true
+	}
+}
