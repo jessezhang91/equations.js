@@ -117,13 +117,13 @@ describe("dependency injection", function () {
 		}]);
 		expect(out).to.eventually.eql([3, 4, 5]);
 
+		var m = new Map();
+		m.set("c", 6);
 		out = inject(fn, [{
 			a: 3,
 			b: 4,
 			c: 5
-		}, {
-			c: 6
-		}]);
+		}, m]);
 		expect(out).to.eventually.eql([3, 4, 6]).and.notify(done);
 	});
 

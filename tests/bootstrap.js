@@ -1,5 +1,10 @@
 "use strict";
 
+// Include babel polyfill once
+if(!Array.from) {
+	require("babelify/polyfill");
+}
+
 var chai = require("chai");
 chai.should();
 chai.use(require("chai-things"));

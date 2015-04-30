@@ -55,6 +55,19 @@ describe("async util", function () {
 		};
 		tests[2] = expect(async.props(c)).to.eventually.be.rejected;
 
+		var d = new Map([
+			[1, deferred.promise],
+			["2", deferred.promise],
+			["b", 1]
+		]);
+		tests[3] = expect(async.props(d).then(function (map) {
+			return Array.from(map.entries());
+		})).to.eventually.be.fulfilled.and.eql([
+			[1, "a"],
+			["2", "a"],
+			["b", 1]
+		]);
+
 		expect(Promise.all(tests)).to.eventually.notify(done);
 	});
 

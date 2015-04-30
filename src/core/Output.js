@@ -1,18 +1,19 @@
 import Parameter from "./Parameter";
 import {inject, annotate} from "../util/di";
+import {$inject} from "../util/symbols";
 
 export default class Output extends Parameter {
-	constructor({equation}) {
+	constructor({formula}) {
 		super(arguments[0]);
 
-		this.equation = annotate(equation);
+		this.formula = annotate(formula);
 	}
 
 	evaluate(...stores) {
-		return inject(this.equation, stores);
+		return inject(this.formula, stores);
 	}
 
 	get dependencies() {
-		return this.equation.$inject;
+		return this.formula[$inject];
 	}
 }
