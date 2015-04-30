@@ -31,9 +31,12 @@ export function inject(fn, ...stores) {
 
 	let promises = fn[$inject].map((name) => {
 		// Replace this with "find" when that is ready
-		let injection = stores.reduceRight(function (item, store) {
+		let injection = stores.reduceRight((item, store) => {
 			if(item !== undefined) {
 				return item;
+			}
+			if(store instanceof Map) {
+				return store.get(name);
 			}
 			return store[name];
 		}, undefined);

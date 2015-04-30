@@ -8,16 +8,21 @@ export function defer() {
 }
 
 export function props(obj) {
-	let keys = Object.keys(obj),
-		promises = keys.map(function (key) {
-			return obj[key];
-		});
+	let isMap = (obj instanceof Map);
+	let keys = isMap ? Array.from(obj.keys()) : Object.keys(obj);
+	let promises = isMap ? Array.from(obj.values()) : keys.map(function (key) {
+		return obj[key];
+	});
 
 	return Promise.all(promises).then(function (values) {
 		return keys.reduce(function (memo, key, i) {
-			memo[key] = values[i];
+			if(isMap) {
+				memo.set(key, values[i]);
+			} else {
+				memo[key] = values[i];
+			}
 			return memo;
-		}, {});
+		}, isMap ? new Map() : {});
 	});
 }
 
