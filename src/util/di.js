@@ -51,3 +51,7 @@ export function inject(fn, ...stores) {
 		return fn.apply(this, args);
 	});
 }
+
+export function isAnnotatable(fn) {
+	return (typeof fn == "function") || (fn instanceof Array && typeof fn[fn.length - 1] == "function");
+}

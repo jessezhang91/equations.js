@@ -4,3 +4,5 @@ export const $meta = Symbol("$meta");
 export const $injections = Symbol("$injections");
 export const $inputs = Symbol("$inputs");
 export const $outputs = Symbol("$outputs");
+
+export const $evaluationOrder = Symbol("$evaluationOrder");

@@ -8,6 +8,8 @@ var gulp = require("gulp"),
 	mocha = require("gulp-mocha"),
 	istanbul = require("gulp-istanbul"),
 	isparta = require("isparta"),
+	glob = require("glob"),
+	plato = require("plato"),
 	watch = require("gulp-watch"),
 	source = require("vinyl-source-stream");
 
@@ -110,6 +112,16 @@ gulp.task("test-lint-watch", function () {
 			});
 		});
 	}
+});
+
+gulp.task("complexity", function (next) {
+	var files = glob.sync("src/**/*.js"),
+		output = "./complexity",
+		options = {
+			title: "equations.js"
+		};
+
+	plato.inspect(files, output, options, next);
 });
 
 

@@ -6,11 +6,22 @@ describe("dependency injection", function () {
 
 	var annotate = di.annotate,
 		inject = di.inject,
+		isAnnotatable = di.isAnnotatable,
 		$inject = symbols.$inject;
+
+	it("should check if something is annotatable", function () {
+		var a = function (e, f, g) {}; // eslint-disable-line no-unused-vars
+		var b = ["e", "f", "g", a];
+		var c = 1;
+
+		expect(isAnnotatable(a)).to.be.true;
+		expect(isAnnotatable(b)).to.be.true;
+		expect(isAnnotatable(c)).to.be.false;
+	});
 
 	it("should annotate functions", function () {
 		/*eslint-disable no-unused-vars */
-		var a = function (a, b, c) {
+		var a = function (x, y, z) {
 				//
 			}, b = function (e, f, g, h) {
 				//
@@ -18,7 +29,7 @@ describe("dependency injection", function () {
 				//
 			};
 
-		function d(a, b, c) {
+		function d(x, y, z) {
 			//
 		}
 		/*eslint-enable no-unused-vars */
@@ -33,22 +44,22 @@ describe("dependency injection", function () {
 		expect(c[$inject]).to.exist;
 		expect(d[$inject]).to.exist;
 
-		expect(a[$inject]).to.eql(["a", "b", "c"]);
+		expect(a[$inject]).to.eql(["x", "y", "z"]);
 		expect(b[$inject]).to.eql(["e", "f", "g", "h"]);
 		expect(c[$inject]).to.eql([]);
-		expect(d[$inject]).to.eql(["a", "b", "c"]);
+		expect(d[$inject]).to.eql(["x", "y", "z"]);
 	});
 
 	it("should not re-annotate functions", function () {
 		/*eslint-disable no-unused-vars */
-		var a = function (a, b, c) {
+		var a = function (x, y, z) {
 			//
 		};
 		/*eslint-enable no-unused-vars */
 
 		annotate(a);
 		expect(a[$inject]).to.exist;
-		expect(a[$inject]).to.eql(["a", "b", "c"]);
+		expect(a[$inject]).to.eql(["x", "y", "z"]);
 
 		var annotations = a[$inject];
 		annotate(a);
@@ -58,17 +69,17 @@ describe("dependency injection", function () {
 
 	it("should handle array-annotation notation", function () {
 		/*eslint-disable no-unused-vars */
-		var fn = function (a, b, c) {
+		var fn = function (x, y, z) {
 			//
 		};
 		/*eslint-enable no-unused-vars */
 
-		var a = ["a", "b", "c", fn];
+		var a = ["x", "y", "z", fn];
 		var b = annotate(a);
 
 		expect(b).to.be.a("function");
 		expect(b).to.equal(fn);
-		expect(b[$inject]).to.eql(["a", "b", "c"]);
+		expect(b[$inject]).to.eql(["x", "y", "z"]);
 	});
 
 	it("should inject values from store", function (done) {
