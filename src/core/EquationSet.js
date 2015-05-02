@@ -3,7 +3,7 @@ import Output from "./Output";
 import * as async from "../util/async";
 import {$injections, $inputs, $outputs, $evaluationOrder} from "../util/symbols";
 
-export default class Equation {
+export default class EquationSet {
 	constructor({injections = {}, inputs = {}, outputs = {}} = {}) {
 		this.injections = injections;
 		this.inputs = inputs;

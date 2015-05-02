@@ -5,7 +5,7 @@ describe("core pieces", function () {
 
 	var Input = eqns.Input,
 		Output = eqns.Output,
-		Equation = eqns.Equation;
+		EquationSet = eqns.EquationSet;
 
 	it("should create inputs", function () {
 		var input = new Input({
@@ -108,19 +108,19 @@ describe("core pieces", function () {
 		})).to.eventually.equal(9).and.notify(done);
 	});
 
-	it("should create equations", function () {
+	it("should create equation set", function () {
 		var fn = function (x, y, z) {}; // eslint-disable-line no-unused-vars
 
-		var equation = new Equation();
-		expect(equation).to.be.instanceof(Equation);
+		var equation = new EquationSet();
+		expect(equation).to.be.instanceof(EquationSet);
 		expect(equation.injections).to.be.instanceof(Object);
 		expect(equation.inputs).to.be.instanceof(Object);
 		expect(equation.outputs).to.be.instanceof(Object);
 
-		equation = new Equation({});
-		expect(equation).to.be.instanceof(Equation);
+		equation = new EquationSet({});
+		expect(equation).to.be.instanceof(EquationSet);
 
-		equation = new Equation({
+		equation = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -136,8 +136,8 @@ describe("core pieces", function () {
 		expect(equation.outputs.c.formula).to.equal(fn);
 	});
 
-	it("should create equations with injection", function () {
-		var equation = new Equation({
+	it("should create equation set with injection", function () {
+		var equation = new EquationSet({
 			injections: {
 				a: 1,
 				b: 2
@@ -155,8 +155,8 @@ describe("core pieces", function () {
 		expect(equation.injections.c).to.be.undefined;
 	});
 
-	it("should create equations with inputs", function () {
-		var equation = new Equation({
+	it("should create equation set with inputs", function () {
+		var equation = new EquationSet({
 			inputs: [
 				"a", {
 					symbol: "b"
@@ -172,7 +172,7 @@ describe("core pieces", function () {
 				inputs.c.symbol === "c";
 		});
 
-		equation = new Equation({
+		equation = new EquationSet({
 			inputs: {
 				a: true,
 				b: {
@@ -196,16 +196,16 @@ describe("core pieces", function () {
 		expect(equation.injections.d).to.be.undefined;
 
 		expect(function () {
-			equation = new Equation({
+			equation = new EquationSet({
 				inputs: [null]
 			});
 		}).to.throw(Error);
 	});
 
-	it("should create equations with outputs", function () {
+	it("should create equation set with outputs", function () {
 		var fn = function (x, y, z) {}; // eslint-disable-line no-unused-vars
 
-		var equation = new Equation({
+		var equation = new EquationSet({
 			outputs: {
 				a: fn,
 				b: {
@@ -228,7 +228,7 @@ describe("core pieces", function () {
 
 	it("should get the evaluation order", function () {
 		/* eslint-disable no-unused-vars */
-		var equation = new Equation({
+		var equation = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -279,7 +279,7 @@ describe("core pieces", function () {
 
 
 		/* eslint-disable no-unused-vars */
-		equation = new Equation({
+		equation = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -318,7 +318,7 @@ describe("core pieces", function () {
 
 
 		/* eslint-disable no-unused-vars */
-		equation = new Equation({
+		equation = new EquationSet({
 			outputs: {
 				e: function (a, b) {}
 			}
@@ -332,7 +332,7 @@ describe("core pieces", function () {
 
 	it("should reset evaluation cache when new outputs are added", function () {
 		/* eslint-disable no-unused-vars */
-		var equation = new Equation({
+		var equation = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -397,10 +397,10 @@ describe("core pieces", function () {
 		expect(evaluationOrder2).to.eql(["i", "e", "f", "h", "g", "j"]);
 	});
 
-	it("should evaluate equations", function (done) {
+	it("should evaluate equation set", function (done) {
 		var tests = [];
 
-		var equation = new Equation({
+		var equation = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -496,7 +496,7 @@ describe("core pieces", function () {
 		});
 
 
-		equation = new Equation({
+		equation = new EquationSet({
 			injections: {
 				a: 1
 			},
