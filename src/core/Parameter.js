@@ -11,30 +11,28 @@ export default class Parameter {
 	get meta() {
 		return this[$meta];
 	}
-	set meta(meta) {
-		if(meta instanceof Map) {
-			this[$meta] = meta;
-			return;
-		}
-
-		this[$meta] = Object.keys(meta).reduce((map, key) => {
-			let item = meta[key];
+	set meta(raw) {
+		let meta = Object.keys(raw).reduce((memo, key) => {
+			let item = raw[key];
 			if(di.isAnnotatable(item)) {
 				item = di.annotate(item);
 			}
-			map.set(key, item);
-			return map;
-		}, new Map());
+			memo[key] = item;
+			return memo;
+		}, {});
+
+		this[$meta] = Object.freeze(meta);
 	}
 
 	evaluateMeta(...stores) {
-		let meta = new Map();
+		let meta = {};
 
-		this.meta.forEach((item, key) => {
+		Object.keys(this.meta).forEach((key) => {
+			let item = this.meta[key];
 			if(typeof item == "function") {
 				item = di.inject(item, stores);
 			}
-			meta.set(key, item);
+			meta[key] = item;
 		});
 
 		return async.props(meta);

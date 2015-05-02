@@ -1,5 +1,6 @@
 import Input from "./Input";
 import Output from "./Output";
+import * as async from "../util/async";
 import {$injections, $inputs, $outputs, $evaluationOrder} from "../util/symbols";
 
 export default class Equation {
@@ -13,20 +14,7 @@ export default class Equation {
 		return this[$injections];
 	}
 	set injections(injections) {
-		if(!(injections instanceof Map)) {
-			this[$injections] = Object.keys(injections).reduce((map, key) => {
-				map.set(key, injections[key]);
-				return map;
-			}, new Map());
-			return;
-		}
-
-		this[$injections] = injections = new Map(injections);
-		injections.forEach((item, key) => {
-			if(typeof key != "string") {
-				throw new Error("Invalid injection provided");
-			}
-		});
+		this[$injections] = Object.freeze(injections);
 	}
 
 	get inputs() {
@@ -48,34 +36,27 @@ export default class Equation {
 			return new Input();
 		};
 
-		if(inputs instanceof Map) {
-			let map = new Map();
-			inputs.forEach((item, key) => {
+		if(inputs instanceof Array) {
+			inputs = inputs.reduce((memo, item) => {
 				item = convert(item);
-				item.symbol = key;
-				map.set(key, item);
-			});
-			this[$inputs] = inputs = map;
-		} else if(inputs instanceof Array) {
-			this[$inputs] = inputs = inputs.reduce((map, item) => {
-				item = convert(item);
-				map.set(item.symbol, item);
-				return map;
-			}, new Map());
+				memo[item.symbol] = item;
+
+				if(typeof item.symbol != "string") {
+					throw new Error("Invalid input symbol `" + item.symbol + "`");
+				}
+
+				return memo;
+			}, {});
 		} else {
-			this[$inputs] = inputs = Object.keys(inputs).reduce((map, key) => {
+			inputs = Object.keys(inputs).reduce((memo, key) => {
 				let item = convert(inputs[key]);
 				item.symbol = key;
-				map.set(key, item);
-				return map;
-			}, new Map());
+				memo[key] = item;
+				return memo;
+			}, {});
 		}
 
-		inputs.forEach((item, key) => {
-			if(item.symbol !== key || typeof key != "string") {
-				throw new Error("Invalid input provided");
-			}
-		});
+		this[$inputs] = Object.freeze(inputs);
 	}
 
 	get outputs() {
@@ -94,29 +75,14 @@ export default class Equation {
 			return new Output(item);
 		};
 
-		if(outputs instanceof Map) {
-			let map = new Map();
-			outputs.forEach((item, key) => {
-				item = convert(item);
-				item.symbol = key;
-				map.set(key, item);
-			});
-			this[$outputs] = outputs = map;
-		} else {
-			this[$outputs] = outputs = Object.keys(outputs).reduce((map, key) => {
-				let item = convert(outputs[key]);
-				item.symbol = key;
-				map.set(key, item);
-				return map;
-			}, new Map());
-		}
+		outputs = Object.keys(outputs).reduce((memo, key) => {
+			let item = convert(outputs[key]);
+			item.symbol = key;
+			memo[key] = item;
+			return memo;
+		}, {});
 
-		outputs.forEach((item, key) => {
-			if(item.symbol !== key || typeof key != "string") {
-				throw new Error("Invalid output provided");
-			}
-		});
-
+		this[$outputs] = Object.freeze(outputs);
 		this[$evaluationOrder] = null;
 	}
 
@@ -144,20 +110,66 @@ export default class Equation {
 
 		return cache;
 	}
+
+	evaluate(ins, ...evals) {
+		let injections = this.injections,
+			inputs = this.inputs,
+			outputs = this.outputs;
+
+		let outs = {};
+		this.getEvaluationOrder.apply(this, evals).forEach((key) => {
+			outs[key] = outputs[key].evaluate(injections, ins, outs);
+		});
+
+		let inMetas = {};
+		Object.keys(ins).forEach((key) => {
+			inMetas[key] = inputs[key].evaluateMeta(injections, ins, outs);
+		});
+
+		let outMetas = {};
+		Object.keys(outs).forEach((key) => {
+			outMetas[key] = outputs[key].evaluateMeta(injections, ins, outs);
+		});
+
+
+		return async.props({
+			inputs: async.props(ins),
+			outputs: async.props(outs),
+			metas: async.props({
+				inputs: async.props(inMetas),
+				outputs: async.props(outMetas)
+			})
+		}).then((data) => {
+			return {
+				inputs: packageResult(data.inputs, data.metas.inputs),
+				outputs: packageResult(data.outputs, data.metas.outputs)
+			};
+		});
+	}
+}
+
+function packageResult(items, metas) {
+	return Object.keys(items).reduce((memo, key) => {
+		memo[key] = {
+			value: items[key],
+			meta: metas[key]
+		};
+		return memo;
+	}, {});
 }
 
 function resolveEvaluationOrder(equation, evals) {
-	let injections = Array.from(equation.injections.keys()),
-		inputs = Array.from(equation.inputs.keys()),
-		outputs = Array.from(equation.outputs.keys());
+	let injections = Object.keys(equation.injections),
+		inputs = Object.keys(equation.inputs),
+		outputs = Object.keys(equation.outputs);
 
 	if(!evals.size) {
 		evals = new Set(outputs);
 	}
 
 	let dependencies = new Map();
-	equation.outputs.forEach(function (output, key) {
-		dependencies.set(key, output.dependencies);
+	outputs.forEach((key) => {
+		dependencies.set(key, equation.outputs[key].dependencies);
 	});
 
 	let order = [];

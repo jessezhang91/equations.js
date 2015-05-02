@@ -1,6 +1,6 @@
 export function defer() {
 	let deferred = {};
-	deferred.promise = new Promise(function (resolve, reject) {
+	deferred.promise = new Promise((resolve, reject) => {
 		deferred.resolve = resolve;
 		deferred.reject = reject;
 	});
@@ -8,21 +8,16 @@ export function defer() {
 }
 
 export function props(obj) {
-	let isMap = (obj instanceof Map);
-	let keys = isMap ? Array.from(obj.keys()) : Object.keys(obj);
-	let promises = isMap ? Array.from(obj.values()) : keys.map(function (key) {
+	let keys = Object.keys(obj);
+	let promises = keys.map((key) => {
 		return obj[key];
 	});
 
-	return Promise.all(promises).then(function (values) {
-		return keys.reduce(function (memo, key, i) {
-			if(isMap) {
-				memo.set(key, values[i]);
-			} else {
-				memo[key] = values[i];
-			}
+	return Promise.all(promises).then((values) => {
+		return keys.reduce((memo, key, i) => {
+			memo[key] = values[i];
 			return memo;
-		}, isMap ? new Map() : {});
+		}, {});
 	});
 }
 

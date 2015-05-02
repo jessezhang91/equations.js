@@ -105,6 +105,8 @@ describe("dependency injection", function () {
 	});
 
 	it("should inject values from multiple stores", function (done) {
+		var tests = [];
+
 		/*eslint-disable no-unused-vars */
 		var fn = function (a, b, c) {
 			return Array.prototype.slice.apply(arguments);
@@ -118,7 +120,7 @@ describe("dependency injection", function () {
 		}, {
 			c: 3
 		});
-		expect(out).to.eventually.eql([1, 2, 3]);
+		tests[0] = expect(out).to.eventually.eql([1, 2, 3]);
 
 		out = inject(fn, [{
 			a: 3,
@@ -126,16 +128,9 @@ describe("dependency injection", function () {
 		}, {
 			c: 5
 		}]);
-		expect(out).to.eventually.eql([3, 4, 5]);
+		tests[1] = expect(out).to.eventually.eql([3, 4, 5]);
 
-		var m = new Map();
-		m.set("c", 6);
-		out = inject(fn, [{
-			a: 3,
-			b: 4,
-			c: 5
-		}, m]);
-		expect(out).to.eventually.eql([3, 4, 6]).and.notify(done);
+		expect(Promise.all(tests)).to.eventually.be.fulfilled.and.notify(done);
 	});
 
 	it("should throw error if missing injection value", function () {

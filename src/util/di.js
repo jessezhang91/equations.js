@@ -12,9 +12,7 @@ export function annotate(fn) {
 		return fn;
 	}
 
-	fn[$inject] = fn.toString().match(/^function .*?\((.*?)\)/)[1].split(/\s*,\s*/).filter(function (a) {
-		return a;
-	});
+	fn[$inject] = fn.toString().match(/^function .*?\((.*?)\)/)[1].split(/\s*,\s*/).filter((a) => a);
 	return fn;
 }
 
@@ -34,9 +32,6 @@ export function inject(fn, ...stores) {
 		let injection = stores.reduceRight((item, store) => {
 			if(item !== undefined) {
 				return item;
-			}
-			if(store instanceof Map) {
-				return store.get(name);
 			}
 			return store[name];
 		}, undefined);
