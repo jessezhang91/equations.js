@@ -21,7 +21,7 @@
     "travis": "gulp build --travis"
   },
   "author": "Jesse Zhang",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "babelify": "^6.0.2",
     "browserify": "^9.0.8",
