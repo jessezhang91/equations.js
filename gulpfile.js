@@ -145,10 +145,13 @@ function errorHandler(e) {
 	console.error(e.stack);
 	/* eslint-enable no-console */
 
-	if(!argv.travis) {
-		if(this.emit) {
-			this.emit("end");
-		}
-		gulp.stop();
+	if(argv.travis) {
+		gulp.stop(1);
+		return;
 	}
+
+	if(this.emit) {
+		this.emit("end");
+	}
+	gulp.stop();
 }
