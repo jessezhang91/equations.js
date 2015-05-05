@@ -12,7 +12,6 @@
   },
   "author": "Jesse Zhang",
   "license": "ISC",
-  "private": "true",
   "devDependencies": {
     "babelify": "^6.0.2",
     "browserify": "^9.0.8",
