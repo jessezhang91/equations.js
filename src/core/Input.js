@@ -5,3 +5,7 @@ export default class Input extends Parameter {
 		super(arguments[0]);
 	}
 }
+
+export function factory(opts) {
+	return new Input(opts);
+}

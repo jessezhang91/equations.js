@@ -6,8 +6,9 @@
   "scripts": {
     "test": "gulp test",
     "lint": "gulp lint",
-    "build": "gulp build",
-    "develop": "gulp watch"
+    "build": "gulp",
+    "develop": "gulp watch",
+    "start": "gulp watch"
   },
   "author": "Jesse Zhang",
   "license": "ISC",

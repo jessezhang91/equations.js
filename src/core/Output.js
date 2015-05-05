@@ -17,3 +17,7 @@ export default class Output extends Parameter {
 		return this.formula[$inject];
 	}
 }
+
+export function factory(opts) {
+	return new Output(opts);
+}

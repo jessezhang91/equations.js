@@ -1,7 +1,10 @@
 - di &#10004;
-- Calculate equations
-- Pre/post-processor
-- Define equation sets and have a global index of them (somehow)
-- Lazy load equation sets
-- Goal seek
-- Goal seek plugins
+- Calculate equations &#10004;
+- Pre/post-processor &#10004;
+- Define equation sets and have a global index of them (somehow) &#10004;
+- <strike>Lazy load equation sets</strike
+- Shareable equation sets (between node and browser?)
+- Plugins &#10004;
+- Web workers
+- <strike>Goal seek</strike>
+- <strike>Goal seek plugins</strike>

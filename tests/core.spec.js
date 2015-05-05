@@ -1,11 +1,26 @@
 "use strict";
 
 describe("core pieces", function () {
-	var symbols = require("../src/util/symbols");
+	var symbols = require("../src/util/symbols"),
+		state = require("../src/util/state");
+	var store = state.store,
+		plugins = state.plugins;
 
 	var Input = eqns.Input,
 		Output = eqns.Output,
-		EquationSet = eqns.EquationSet;
+		EquationSet = eqns.EquationSet,
+		inputFactory = eqns.input,
+		outputFactory = eqns.output,
+		equationSetFactory = eqns.equationSet;
+
+	beforeEach(function () {
+		store.clear();
+		plugins.pre.splice(0, plugins.pre.length);
+		plugins.post.splice(0, plugins.post.length);
+		Object.keys(plugins.fn).forEach(function (key) {
+			delete plugins.fn[key];
+		});
+	});
 
 	it("should create inputs", function () {
 		var input = new Input({
@@ -111,16 +126,16 @@ describe("core pieces", function () {
 	it("should create equation set", function () {
 		var fn = function (x, y, z) {}; // eslint-disable-line no-unused-vars
 
-		var equation = new EquationSet();
-		expect(equation).to.be.instanceof(EquationSet);
-		expect(equation.injections).to.be.instanceof(Object);
-		expect(equation.inputs).to.be.instanceof(Object);
-		expect(equation.outputs).to.be.instanceof(Object);
+		var equationSet = new EquationSet();
+		expect(equationSet).to.be.instanceof(EquationSet);
+		expect(equationSet.injections).to.be.instanceof(Object);
+		expect(equationSet.inputs).to.be.instanceof(Object);
+		expect(equationSet.outputs).to.be.instanceof(Object);
 
-		equation = new EquationSet({});
-		expect(equation).to.be.instanceof(EquationSet);
+		equationSet = new EquationSet({});
+		expect(equationSet).to.be.instanceof(EquationSet);
 
-		equation = new EquationSet({
+		equationSet = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -131,32 +146,32 @@ describe("core pieces", function () {
 				c: fn
 			}
 		});
-		expect(equation.injections.a).to.equal(1);
-		expect(equation.inputs.b.symbol).to.equal("b");
-		expect(equation.outputs.c.formula).to.equal(fn);
+		expect(equationSet.injections.a).to.equal(1);
+		expect(equationSet.inputs.b.symbol).to.equal("b");
+		expect(equationSet.outputs.c.formula).to.equal(fn);
 	});
 
 	it("should create equation set with injection", function () {
-		var equation = new EquationSet({
+		var equationSet = new EquationSet({
 			injections: {
 				a: 1,
 				b: 2
 			}
 		});
-		expect(equation.injections).to.have.keys(["a", "b"]);
-		expect(equation.injections).to.eql({
+		expect(equationSet.injections).to.have.keys(["a", "b"]);
+		expect(equationSet.injections).to.eql({
 			a: 1,
 			b: 2
 		});
 
 		expect(function () {
-			equation.injections.c = 3;
+			equationSet.injections.c = 3;
 		}).to.throw(TypeError);
-		expect(equation.injections.c).to.be.undefined;
+		expect(equationSet.injections.c).to.be.undefined;
 	});
 
 	it("should create equation set with inputs", function () {
-		var equation = new EquationSet({
+		var equationSet = new EquationSet({
 			inputs: [
 				"a", {
 					symbol: "b"
@@ -165,14 +180,14 @@ describe("core pieces", function () {
 				})
 			]
 		});
-		expect(equation.inputs).to.have.keys(["a", "b", "c"]);
-		expect(equation.inputs).to.satisfy(function (inputs) {
+		expect(equationSet.inputs).to.have.keys(["a", "b", "c"]);
+		expect(equationSet.inputs).to.satisfy(function (inputs) {
 			return inputs.a.symbol === "a" &&
 				inputs.b.symbol === "b" &&
 				inputs.c.symbol === "c";
 		});
 
-		equation = new EquationSet({
+		equationSet = new EquationSet({
 			inputs: {
 				a: true,
 				b: {
@@ -183,20 +198,20 @@ describe("core pieces", function () {
 				})
 			}
 		});
-		expect(equation.inputs).to.have.keys(["a", "b", "c"]);
-		expect(equation.inputs).to.satisfy(function (inputs) {
+		expect(equationSet.inputs).to.have.keys(["a", "b", "c"]);
+		expect(equationSet.inputs).to.satisfy(function (inputs) {
 			return inputs.a.symbol === "a" &&
 				inputs.b.symbol === "b" &&
 				inputs.c.symbol === "c";
 		});
 
 		expect(function () {
-			equation.injections.d = 3;
+			equationSet.inputs.d = 3;
 		}).to.throw(TypeError);
-		expect(equation.injections.d).to.be.undefined;
+		expect(equationSet.inputs.d).to.be.undefined;
 
 		expect(function () {
-			equation = new EquationSet({
+			equationSet = new EquationSet({
 				inputs: [null]
 			});
 		}).to.throw(Error);
@@ -205,7 +220,7 @@ describe("core pieces", function () {
 	it("should create equation set with outputs", function () {
 		var fn = function (x, y, z) {}; // eslint-disable-line no-unused-vars
 
-		var equation = new EquationSet({
+		var equationSet = new EquationSet({
 			outputs: {
 				a: fn,
 				b: {
@@ -218,17 +233,47 @@ describe("core pieces", function () {
 				})
 			}
 		});
-		expect(equation.outputs).to.have.keys(["a", "b", "c"]);
-		expect(equation.outputs).to.satisfy(function (outputs) {
+		expect(equationSet.outputs).to.have.keys(["a", "b", "c"]);
+		expect(equationSet.outputs).to.satisfy(function (outputs) {
 			return outputs.a.symbol === "a" &&
 				outputs.b.symbol === "b" &&
 				outputs.c.symbol === "c";
 		});
+
+
+		equationSet = new EquationSet({
+			outputs: [
+				new Output({
+					symbol: "a",
+					formula: fn
+				})
+			]
+		});
+		expect(equationSet.outputs).to.have.keys(["a"]);
+		expect(equationSet.outputs).to.satisfy(function (outputs) {
+			return outputs.a.symbol === "a";
+		});
+
+		expect(function () {
+			equationSet = new EquationSet({
+				outputs: [
+					new Output({
+						symbol: 1,
+						formula: fn
+					})
+				]
+			});
+		}).to.throw(Error);
+
+		expect(function () {
+			equationSet.outputs.d = 3;
+		}).to.throw(TypeError);
+		expect(equationSet.outputs.d).to.be.undefined;
 	});
 
 	it("should get the evaluation order", function () {
 		/* eslint-disable no-unused-vars */
-		var equation = new EquationSet({
+		var equationSet = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -261,25 +306,25 @@ describe("core pieces", function () {
 		 * ===> e, f, h, g, i, j
 		 */
 
-		var evaluationOrder = equation.evaluationOrder;
-		expect(evaluationOrder).to.equal(equation.evaluationOrder);
+		var evaluationOrder = equationSet.evaluationOrder;
+		expect(evaluationOrder).to.equal(equationSet.evaluationOrder);
 
 		expect(evaluationOrder).to.eql(["e", "f", "h", "g", "i", "j"]);
 
-		expect(equation.getEvaluationOrder("g")).to.eql(["e", "f", "h", "g"]);
+		expect(equationSet.getEvaluationOrder("g")).to.eql(["e", "f", "h", "g"]);
 
-		expect(equation.getEvaluationOrder("f", "i")).to.eql(["e", "f", "i"]);
+		expect(equationSet.getEvaluationOrder("f", "i")).to.eql(["e", "f", "i"]);
 
-		expect(equation.getEvaluationOrder(["f", "i"])).to.eql(["e", "f", "i"]);
+		expect(equationSet.getEvaluationOrder(["f", "i"])).to.eql(["e", "f", "i"]);
 
 		expect(function () {
-			equation.getEvaluationOrder("n");
+			equationSet.getEvaluationOrder("n");
 		}).to.throw(/not defined/);
 
 
 
 		/* eslint-disable no-unused-vars */
-		equation = new EquationSet({
+		equationSet = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -312,13 +357,13 @@ describe("core pieces", function () {
 		 * =x=> e -> g -> h -> f -> e
 		 */
 		expect(function () {
-			equation.evaluationOrder;
+			equationSet.evaluationOrder;
 		}).to.throw(/e -> g -> h -> f -> e/);
 
 
 
 		/* eslint-disable no-unused-vars */
-		equation = new EquationSet({
+		equationSet = new EquationSet({
 			outputs: {
 				e: function (a, b) {}
 			}
@@ -326,13 +371,13 @@ describe("core pieces", function () {
 		/* eslint-enable no-unused-vars */
 
 		expect(function () {
-			equation.evaluationOrder;
+			equationSet.evaluationOrder;
 		}).to.throw(/missing dependency/);
 	});
 
 	it("should reset evaluation cache when new outputs are added", function () {
 		/* eslint-disable no-unused-vars */
-		var equation = new EquationSet({
+		var equationSet = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -365,13 +410,13 @@ describe("core pieces", function () {
 		 * ===> e, f, h, g, i, j
 		 */
 
-		var evaluationOrder = equation.evaluationOrder;
-		expect(evaluationOrder).to.equal(equation.evaluationOrder);
+		var evaluationOrder = equationSet.evaluationOrder;
+		expect(evaluationOrder).to.equal(equationSet.evaluationOrder);
 		expect(evaluationOrder).to.eql(["e", "f", "h", "g", "i", "j"]);
 
 
 		/* eslint-disable no-unused-vars */
-		equation.outputs = {
+		equationSet.outputs = {
 			e: function (a, b, i) {},
 			f: function (e) {},
 			g: function (h) {},
@@ -391,8 +436,8 @@ describe("core pieces", function () {
 		 *
 		 * ===> i, e, f, h, g, j
 		 */
-		var evaluationOrder2 = equation.evaluationOrder;
-		expect(evaluationOrder2).to.equal(equation.evaluationOrder);
+		var evaluationOrder2 = equationSet.evaluationOrder;
+		expect(evaluationOrder2).to.equal(equationSet.evaluationOrder);
 		expect(evaluationOrder2).to.not.equal(evaluationOrder);
 		expect(evaluationOrder2).to.eql(["i", "e", "f", "h", "g", "j"]);
 	});
@@ -400,7 +445,7 @@ describe("core pieces", function () {
 	it("should evaluate equation set", function (done) {
 		var tests = [];
 
-		var equation = new EquationSet({
+		var equationSet = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -444,7 +489,7 @@ describe("core pieces", function () {
 			}
 		});
 
-		tests[0] = expect(equation.evaluate({
+		tests[0] = expect(equationSet.evaluate({
 			b: 2,
 			c: 3,
 			d: Promise.resolve(4)
@@ -496,7 +541,7 @@ describe("core pieces", function () {
 		});
 
 
-		equation = new EquationSet({
+		equationSet = new EquationSet({
 			injections: {
 				a: 1
 			},
@@ -540,7 +585,7 @@ describe("core pieces", function () {
 			}
 		});
 
-		tests[1] = expect(equation.evaluate({
+		tests[1] = expect(equationSet.evaluate({
 			b: 2,
 			c: 3,
 			d: Promise.resolve(4)
@@ -570,7 +615,7 @@ describe("core pieces", function () {
 		});
 
 
-		tests[2] = expect(equation.evaluate({
+		tests[2] = expect(equationSet.evaluate({
 			b: 2,
 			c: 3,
 			d: Promise.resolve(4)
@@ -601,5 +646,128 @@ describe("core pieces", function () {
 
 
 		expect(Promise.all(tests)).to.be.fulfilled.and.notify(done);
+	});
+
+	it("should have factories", function (done) {
+		var input = inputFactory({
+			symbol: "a"
+		});
+
+		var output = outputFactory({
+			symbol: "b",
+			formula: function (a) {
+				return 2 * a;
+			}
+		});
+
+		var equationSet = equationSetFactory({
+			inputs: [input],
+			outputs: [output]
+		});
+
+		expect(input).to.be.instanceof(Input);
+		expect(input.symbol).to.equal("a");
+
+		expect(output).to.be.instanceof(Output);
+		expect(output.symbol).to.equal("b");
+
+		expect(equationSet).to.be.instanceof(EquationSet);
+
+		expect(equationSet.evaluate({
+			a: 1
+		})).to.eventually.eql({
+			inputs: {
+				a: {
+					value: 1,
+					meta: {}
+				}
+			},
+			outputs: {
+				b: {
+					value: 2,
+					meta: {}
+				}
+			}
+		}).and.notify(done);
+	});
+
+	it("should name equation sets", function () {
+		var equationSet = new EquationSet({
+			name: "test"
+		});
+
+		expect(equationSet.name).to.equal("test");
+		expect(eqns.has("test")).to.be.true;
+		expect(eqns.get("test")).to.equal(equationSet);
+
+		equationSet.name = "testing";
+		expect(eqns.has("test")).to.be.false;
+		expect(eqns.get("test")).to.undefined;
+		expect(eqns.get("testing")).to.equal(equationSet);
+
+		equationSet.name = "testing";
+		expect(eqns.get("testing")).to.equal(equationSet);
+
+		var equationSet2 = new EquationSet({
+			name: "test"
+		});
+		expect(eqns.get("test")).to.equal(equationSet2);
+
+		expect(function () {
+			equationSet2.name = "testing";
+		}).to.throw(Error);
+	});
+
+	it("should be pluggable", function (done) {
+		var input = inputFactory({
+			symbol: "a"
+		});
+
+		var output = outputFactory({
+			symbol: "b",
+			formula: function (a) {
+				return 2 * a;
+			}
+		});
+
+		var equationSet = equationSetFactory({
+			inputs: [input],
+			outputs: [output]
+		});
+
+		plugins.pre.push(function (ins) {
+			Object.keys(ins).forEach(function (key) {
+				ins[key] *= -2;
+			});
+			return ins;
+		});
+
+		plugins.post.push(function (data) {
+			data.post = true;
+			return data;
+		});
+		expect(equationSet.evaluate({
+			a: 2
+		})).to.eventually.eql({
+			inputs: {
+				a: {
+					value: -4,
+					meta: {}
+				}
+			},
+			outputs: {
+				b: {
+					value: -8,
+					meta: {}
+				}
+			},
+			post: true
+		}).and.notify(done);
+
+
+		plugins.fn.run = function () {
+			return 1;
+		};
+		expect(eqns.run()).to.equal(1);
 	});
 });

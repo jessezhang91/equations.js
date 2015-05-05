@@ -37,7 +37,7 @@ export function inject(fn, ...stores) {
 		}, undefined);
 
 		if (injection === undefined) {
-			throw new Error("Cannot find dependency: " + name, fn);
+			throw new Error(`Cannot find dependency: ${name}`, fn);
 		}
 		return injection;
 	});
