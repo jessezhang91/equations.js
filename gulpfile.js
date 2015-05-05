@@ -7,6 +7,7 @@ var gulp = require("gulp"),
 	eslint = require("gulp-eslint"),
 	mocha = require("gulp-mocha"),
 	istanbul = require("gulp-istanbul"),
+	coveralls = require("gulp-coveralls"),
 	isparta = require("isparta"),
 	glob = require("glob"),
 	plato = require("plato"),
@@ -69,6 +70,11 @@ gulp.task("test", function (next) {
 				}))
 				.on("end", next);
 		});
+});
+
+gulp.task("test-coveralls", ["test"], function () {
+	gulp.src("coverage/lcov.info")
+		.pipe(coveralls());
 });
 
 gulp.task("test-watch", function () {
