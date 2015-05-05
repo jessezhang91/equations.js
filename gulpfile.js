@@ -14,6 +14,12 @@ var gulp = require("gulp"),
 	watch = require("gulp-watch"),
 	source = require("vinyl-source-stream");
 
+var argv = require("yargs").boolean(["travis"]).argv;
+
+gulp.task("build", ["test-coveralls", "lint"], function () {
+	bundle(false);
+});
+
 gulp.task("default", function () {
 	bundle(false);
 });
@@ -92,7 +98,9 @@ gulp.task("lint", function () {
 		.pipe(eslint({
 			useEslintrc: true
 		}))
-		.pipe(eslint.format());
+		.pipe(eslint.format())
+		.pipe(eslint.failAfterError())
+		.on("error", errorHandler);
 });
 
 gulp.task("lint-watch", function () {
@@ -137,8 +145,10 @@ function errorHandler(e) {
 	console.error(e.stack);
 	/* eslint-enable no-console */
 
-	if(this.emit) {
-		this.emit("end");
+	if(!argv.travis) {
+		if(this.emit) {
+			this.emit("end");
+		}
+		gulp.stop();
 	}
-	gulp.stop();
 }

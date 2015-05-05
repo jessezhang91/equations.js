@@ -15,9 +15,10 @@
   "scripts": {
     "test": "gulp test",
     "lint": "gulp lint",
-    "build": "gulp",
+    "build": "gulp build",
     "develop": "gulp watch",
-    "start": "gulp watch"
+    "start": "gulp watch",
+    "travis": "gulp build --travis"
   },
   "author": "Jesse Zhang",
   "license": "ISC",
@@ -38,6 +39,7 @@
     "istanbul": "^0.3.13",
     "plato": "^1.4.0",
     "vinyl-source-stream": "^1.1.0",
-    "watchify": "^3.2.0"
+    "watchify": "^3.2.0",
+    "yargs": "^3.8.0"
   }
 }
