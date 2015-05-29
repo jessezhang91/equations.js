@@ -149,7 +149,9 @@ export default class EquationSet {
 	}
 
 	evaluate(rawIns, ...evals) {
-		let prePromise = async.props(rawIns);
+		let pickedIns = pickKeys(rawIns, Object.keys(this.inputs));
+
+		let prePromise = async.props(pickedIns);
 		plugins.pre.forEach((plugin) => {
 			prePromise = prePromise.then((data) => {
 				return plugin.call(this, data);
@@ -168,7 +170,9 @@ export default class EquationSet {
 		return postPromise;
 	}
 
-	evaluateRaw(ins, ...evals) {
+	evaluateRaw(rawIns, ...evals) {
+		let ins = pickKeys(rawIns, Object.keys(this.inputs));
+
 		let injections = this.injections,
 			inputs = this.inputs,
 			outputs = this.outputs;
@@ -211,6 +215,13 @@ function packageResult(items, metas) {
 			value: items[key],
 			meta: metas[key]
 		};
+		return memo;
+	}, {});
+}
+
+function pickKeys(item, keys) {
+	return keys.reduce((memo, key) => {
+		memo[key] = item[key];
 		return memo;
 	}, {});
 }

@@ -648,6 +648,155 @@ describe("core pieces", function () {
 		expect(Promise.all(tests)).to.be.fulfilled.and.notify(done);
 	});
 
+	it("should evaluate equation set with prototypes", function (done) {
+		var equationSet = new EquationSet({
+			injections: {
+				a: 1
+			},
+			inputs: [
+				"b",
+				"c",
+				{
+					symbol: "d",
+					meta: {
+						z: function (h, i, j) {
+							return (h + i) * j;
+						}
+					}
+				}],
+			outputs: {
+				e: function (a, b) {
+					return a + b;
+				},
+				f: function (e) {
+					return Math.pow(e, 2);
+				},
+				g: function (h) {
+					return h / 2;
+				},
+				h: function (f, e) {
+					return f - e;
+				},
+				i: function (a) {
+					return a * 2;
+				},
+				j: {
+					formula: function (i, g) {
+						return Math.pow(i, g);
+					},
+					meta: {
+						a: function (b, g, f) {
+							return b * g * f;
+						}
+					}
+				}
+			}
+		});
+
+		var inputs = Object.create({
+			c: 3,
+			d: Promise.resolve(4)
+		});
+		inputs.b = 2;
+
+		var tests = [];
+		tests[0] = expect(equationSet.evaluate(inputs)).to.eventually.eql({
+			inputs: {
+				b: {
+					value: 2,
+					meta: {}
+				},
+				c: {
+					value: 3,
+					meta: {}
+				},
+				d: {
+					value: 4,
+					meta: {
+						z: 64
+					}
+				}
+			},
+			outputs: {
+				e: {
+					value: 3,
+					meta: {}
+				},
+				f: {
+					value: 9,
+					meta: {}
+				},
+				h: {
+					value: 6,
+					meta: {}
+				},
+				g: {
+					value: 3,
+					meta: {}
+				},
+				i: {
+					value: 2,
+					meta: {}
+				},
+				j: {
+					value: 8,
+					meta: {
+						a: 54
+					}
+				}
+			}
+		});
+
+		tests[1] = expect(equationSet.evaluateRaw(inputs)).to.eventually.eql({
+			inputs: {
+				b: {
+					value: 2,
+					meta: {}
+				},
+				c: {
+					value: 3,
+					meta: {}
+				},
+				d: {
+					value: 4,
+					meta: {
+						z: 64
+					}
+				}
+			},
+			outputs: {
+				e: {
+					value: 3,
+					meta: {}
+				},
+				f: {
+					value: 9,
+					meta: {}
+				},
+				h: {
+					value: 6,
+					meta: {}
+				},
+				g: {
+					value: 3,
+					meta: {}
+				},
+				i: {
+					value: 2,
+					meta: {}
+				},
+				j: {
+					value: 8,
+					meta: {
+						a: 54
+					}
+				}
+			}
+		}).and.notify(done);
+
+		// expect(Promise.all(tests)).to.be.fulfilled.and.notify(done);
+	});
+
 	it("should have factories", function (done) {
 		var input = inputFactory({
 			symbol: "a"
