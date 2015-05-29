@@ -35,7 +35,8 @@ function bundle(watching) {
 
 	var b = browserify(src, {
 		debug: true,
-		cache: {}
+		cache: {},
+		standalone: "eqns"
 	}).transform(babelify);
 
 	if (watching) {
@@ -145,12 +146,12 @@ function errorHandler(e) {
 	console.error(e.stack);
 	/* eslint-enable no-console */
 
-	if(argv.travis) {
+	if (argv.travis) {
 		gulp.stop(1);
 		return;
 	}
 
-	if(this.emit) {
+	if (this.emit) {
 		this.emit("end");
 	}
 	gulp.stop();

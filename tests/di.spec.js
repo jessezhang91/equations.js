@@ -104,6 +104,22 @@ describe("dependency injection", function () {
 		expect(out).to.eventually.eql([3, 4, 5]).and.notify(done);
 	});
 
+	it("should inject values from store with prototype", function (done) {
+		/*eslint-disable no-unused-vars */
+		var fn = function (a, b, c) {
+			return Array.prototype.slice.apply(arguments);
+		};
+		/*eslint-enable no-unused-vars */
+
+		var store = Object.create({
+			b: 2,
+			c: 3
+		});
+		store.a = 1;
+		var out = inject(fn, store);
+		expect(out).to.eventually.eql([1, 2, 3]).and.notify(done);
+	});
+
 	it("should inject values from multiple stores", function (done) {
 		var tests = [];
 

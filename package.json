@@ -1,6 +1,6 @@
 {
   "name": "equations.js",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "main": "src/index.js",
   "description": "Dependency-injected equation sets",
   "keywords": [

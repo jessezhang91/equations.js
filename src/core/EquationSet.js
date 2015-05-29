@@ -90,7 +90,7 @@ export default class EquationSet {
 			if(item instanceof Output) {
 				return item;
 			}
-			if(typeof item == "function") {
+			if(typeof item == "function" || item instanceof Array) {
 				return new Output({
 					formula: item
 				});
