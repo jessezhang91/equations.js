@@ -1,256 +1,67 @@
-import Input from "./Input";
-import Output from "./Output";
+// import * as di from "../util/di";
+import {$inject} from "../util/symbols";
 import * as async from "../util/async";
-import {$name, $injections, $inputs, $outputs, $evaluationOrder} from "../util/symbols";
-import {store, plugins} from "../util/state";
+import * as di from "../util/di";
+import Equation from "./Equation";
 
 export default class EquationSet {
-	constructor({name = null, injections = {}, inputs = {}, outputs = {}} = {}) {
-		this.name = name;
-		this.injections = injections;
-		this.inputs = inputs;
-		this.outputs = outputs;
-	}
+	constructor({ options = {}, inputs = {}, calculations = {}, outputs = {} }) {
+		this.options = options;
 
-	get name() {
-		return this[$name];
-	}
-	set name(name) {
-		let prevName = this[$name];
-		if(prevName === name) {
-			return;
+		// Initialize options
+		if(typeof this.options.iterative == "object" || this.options.iterative === true) {
+			let iterative = this.options.iterative = (this.options.iterative === true ? {} : this.options.iterative);
+			iterative.maxSteps = (iterative.maxSteps == null || Number.isNaN(iterative.maxSteps) ? 1e-6 : Number(iterative.maxSteps));
+			iterative.delta = (iterative.delta == null || Number.isNaN(iterative.delta) ? 1e-6 : Number(iterative.delta));
+		} else {
+			this.options.iterative = undefined;
 		}
 
-		if(prevName != null && store.has(prevName)) {
-			store.delete(prevName);
-		}
-		if(name != null) {
-			if(store.has(name)) {
-				throw new Error(`Equation Set '${name}' already exists.`);
-			}
-			store.set(name, this);
-		}
-		this[$name] = name;
-	}
-
-	get injections() {
-		return this[$injections];
-	}
-	set injections(injections) {
-		this[$injections] = Object.freeze(injections);
-	}
-
-	get inputs() {
-		return this[$inputs];
-	}
-	set inputs(inputs) {
-		let convert = (item) => {
-			if(item instanceof Input) {
-				return item;
-			}
-			if(typeof item == "string") {
-				return new Input({
-					symbol: item
-				});
-			}
-			if(typeof item == "object" && item != null) {
-				return new Input(item);
-			}
-			return new Input();
+		// Initialize sets
+		this.sets = {
+			inputs: parseSet(inputs),
+			calculations: parseSet(calculations),
+			outputs: parseSet(outputs)
 		};
 
-		if(inputs instanceof Array) {
-			inputs = inputs.reduce((memo, item) => {
-				item = convert(item);
-				memo[item.symbol] = item;
-
-				if(typeof item.symbol != "string") {
-					throw new Error(`Invalid input symbol '${item.symbol}'`);
-				}
-
-				return memo;
-			}, {});
-		} else {
-			inputs = Object.keys(inputs).reduce((memo, key) => {
-				let item = convert(inputs[key]);
-				item.symbol = key;
-				memo[key] = item;
-				return memo;
-			}, {});
-		}
-
-		this[$inputs] = Object.freeze(inputs);
+		this.evaluationOrder = getEvaluationOrder(this.sets);
 	}
 
-	get outputs() {
-		return this[$outputs];
-	}
-	set outputs(outputs) {
-		let convert = (item) => {
-			if(item instanceof Output) {
-				return item;
-			}
-			if(typeof item == "function" || item instanceof Array) {
-				return new Output({
-					formula: item
-				});
-			}
-			return new Output(item);
-		};
-
-
-		if(outputs instanceof Array) {
-			outputs = outputs.reduce((memo, item) => {
-				item = convert(item);
-				memo[item.symbol] = item;
-
-				if(typeof item.symbol != "string") {
-					throw new Error(`Invalid output symbol '${item.symbol}'`);
-				}
-
-				return memo;
-			}, {});
-		} else {
-			outputs = Object.keys(outputs).reduce((memo, key) => {
-				let item = convert(outputs[key]);
-				item.symbol = key;
-				memo[key] = item;
-				return memo;
-			}, {});
-		}
-
-		this[$outputs] = Object.freeze(outputs);
-		this[$evaluationOrder] = null;
-	}
-
-	get evaluationOrder() {
-		return this.getEvaluationOrder();
-	}
-
-	getEvaluationOrder(...evals) {
-		if(evals[0] instanceof Array) {
-			evals = evals[0];
-		}
-		evals = new Set(evals);
-
-		if(this[$evaluationOrder] == null) {
-			this[$evaluationOrder] = new Map();
-		}
-
-		let cacheKey = Array.from(evals).join(),
-			cache = this[$evaluationOrder].get(cacheKey);
-		if(cache) {
-			return cache;
-		}
-		cache = resolveEvaluationOrder(this, evals);
-		this[$evaluationOrder].set(cacheKey, cache);
-
-		return cache;
-	}
-
-	evaluate(rawIns, ...evals) {
-		let pickedIns = pickKeys(rawIns, Object.keys(this.inputs));
-
-		let prePromise = async.props(pickedIns);
-		plugins.pre.forEach((plugin) => {
-			prePromise = prePromise.then((data) => {
-				return plugin.call(this, data);
-			});
-		});
-
-		let postPromise = prePromise.then((ins) => {
-			return this.evaluateRaw.apply(this, [].concat([ins]).concat(evals));
-		});
-		plugins.post.forEach((plugin) => {
-			postPromise = postPromise.then((data) => {
-				return plugin.call(this, data);
-			});
-		});
-
-		return postPromise;
-	}
-
-	evaluateRaw(rawIns, ...evals) {
-		let ins = pickKeys(rawIns, Object.keys(this.inputs));
-
-		let injections = this.injections,
-			inputs = this.inputs,
-			outputs = this.outputs;
-
-		let outs = {};
-		this.getEvaluationOrder.apply(this, evals).forEach((key) => {
-			outs[key] = outputs[key].evaluate(injections, ins, outs);
-		});
-
-		let inMetas = {};
-		Object.keys(ins).forEach((key) => {
-			inMetas[key] = inputs[key].evaluateMeta(injections, ins, outs);
-		});
-
-		let outMetas = {};
-		Object.keys(outs).forEach((key) => {
-			outMetas[key] = outputs[key].evaluateMeta(injections, ins, outs);
-		});
-
-
-		return async.props({
-			inputs: async.props(ins),
-			outputs: async.props(outs),
-			metas: async.props({
-				inputs: async.props(inMetas),
-				outputs: async.props(outMetas)
-			})
-		}).then((data) => {
-			return {
-				inputs: packageResult(data.inputs, data.metas.inputs),
-				outputs: packageResult(data.outputs, data.metas.outputs)
-			};
-		});
+	calculate(inputs, nonblocking = false) {
+		return calculateInternals.bind(this)(inputs, nonblocking);
 	}
 }
 
-function packageResult(items, metas) {
-	return Object.keys(items).reduce((memo, key) => {
-		memo[key] = {
-			value: items[key],
-			meta: metas[key]
-		};
+function parseSet(set) {
+	return Object.keys(set).reduce((memo, key) => {
+		memo[key] = new Equation(key, set[key]);
 		return memo;
 	}, {});
 }
 
-function pickKeys(item, keys) {
-	return keys.reduce((memo, key) => {
-		memo[key] = item[key];
+function getEvaluationOrder(sets) {
+	let dependencies = Object.keys(sets).reduce((memo, setKey) => {
+		let set = sets[setKey];
+
+		Object.keys(set).forEach((key) => {
+			let equation = set[key];
+			memo[key] = (equation.value === undefined ? (equation.equation ? equation.equation[$inject] : []) : []);
+			return memo;
+		});
+
 		return memo;
 	}, {});
-}
-
-function resolveEvaluationOrder(equation, evals) {
-	let injections = Object.keys(equation.injections),
-		inputs = Object.keys(equation.inputs),
-		outputs = Object.keys(equation.outputs);
-
-	if(!evals.size) {
-		evals = new Set(outputs);
-	}
-
-	let dependencies = new Map();
-	outputs.forEach((key) => {
-		dependencies.set(key, equation.outputs[key].dependencies);
-	});
 
 	let order = [];
-
 	let processedOutputs = new Set();
 	let processOutput = (key, set = new Set()) => {
 		if(processedOutputs.has(key)) {
 			return;
 		}
 
-		let deps = dependencies.get(key);
+		let deps = dependencies[key];
 		if(!deps) {
-			throw new Error(`Output '${key}' not defined in equations set`);
+			throw new Error(`'${key}' not defined in equations set`);
 		}
 		if(set.has(key)) {
 			let path = Array.from(set.values()).join(" -> ") + " -> " + key;
@@ -258,23 +69,124 @@ function resolveEvaluationOrder(equation, evals) {
 		}
 		set.add(key);
 
-		deps.filter((dep) => {
-			return !~injections.indexOf(dep) && !~inputs.indexOf(dep);
-		}).forEach((dep) => {
-			if(!~outputs.indexOf(dep)) {
-				throw new Error(`Output '${key}' has a missing dependency '${dep}'`);
+		deps.forEach((dep) => {
+			if(dependencies[dep] == null) {
+				throw new Error(`'${key}' has a missing dependency '${dep}'`);
 			}
-
 			processOutput(dep, new Set(set));
 		});
-		order.push(key);
 		processedOutputs.add(key);
+		order.push(key);
 	};
-	evals.forEach((key) => processOutput(key));
+	Object.keys(dependencies).forEach((key) => processOutput(key));
 
 	return order;
 }
 
-export function factory(opts) {
-	return new EquationSet(opts);
+function calculateInternals(inputs, nonblocking) {
+	let sets = this.sets,
+		evaluationOrder = this.evaluationOrder;
+
+	let inputKeys = new Set(Object.keys(sets.inputs));
+	let equations = Object.keys(sets).reduce((memo, setKey) => {
+		let set = sets[setKey];
+
+		Object.keys(set).forEach((key) => {
+			memo[key] = set[key];
+		});
+		return memo;
+	}, {});
+
+	// Get options
+	let maxSteps = 0, delta = 0;
+	if(this.options.iterative) {
+		let iterative = this.options.iterative;
+		maxSteps = iterative.maxSteps;
+		delta = iterative.delta;
+	}
+	let allowNaN = !!this.options.allowNaN;
+
+	// Get starting store
+	let store, storePromises;
+	storePromises = evaluationOrder.reduce((memo, key) => {
+		memo[key] = (inputs[key] !== undefined && inputKeys.has(key) ? inputs[key] : equations[key].value);
+		return memo;
+	}, {});
+
+	return async.props(storePromises).then((result) => {
+		store = result;
+		return step.bind(this)(0);
+	});
+
+	function step(n) {
+		storePromises = evaluationOrder.reduce((memo, key) => {
+			let equation = equations[key];
+			if(equation.equation && (equation.value === undefined || n > 0)) {
+				// Use last iteration if value is not undefined, otherwise, use current store
+				memo[key] = di.inject(equation.equation, (equation.value === undefined ? memo : store));
+			} else {
+				memo[key] = store[key];
+			}
+			return memo;
+		}, {});
+
+		return async.props(storePromises).then((nextStore) => {
+			// Check delta
+			let dirty = Object.keys(nextStore).some((key) => {
+				let prev = store[key],
+					curr = nextStore[key];
+
+				if(!allowNaN && Number.isNaN(curr)) {
+					throw new Error(`${key} is NaN on step ${n}`);
+				}
+
+				// Matches
+				if(prev === curr) {
+					return false;
+				}
+
+				// Both are null or undefined
+				if(prev == null && curr == null) {
+					return false;
+				}
+
+				// One is null or undefined
+				if(prev == null || curr == null) {
+					return true;
+				}
+
+				// both NaN
+				if(Number.isNaN(prev) && Number.isNaN(curr)) {
+					return false;
+				}
+
+				// One is 0, check versus delta
+				if(prev === 0 || curr === 0) {
+					return Math.abs((prev - curr) / Math.max(Math.abs(prev), Math.abs(curr))) >= delta;
+				}
+
+				// Check versus delta
+				return Math.abs((prev - curr) / curr) >= delta;
+			});
+
+			store = nextStore;
+
+			let next = () => {
+				return (++n > maxSteps || !dirty) ? formatResult(store) : step.bind(this)(n);
+			};
+			return nonblocking ? new Promise((resolve) => setTimeout(() => resolve(next.bind(this)()))) : next();
+		});
+	}
+
+	function formatResult(result) {
+		return Object.keys(sets).reduce((setMemo, setKey) => {
+			let set = sets[setKey];
+
+			setMemo[setKey] = Object.keys(set).reduce((memo, key) => {
+				memo[key] = result[key];
+				return memo;
+			}, {});
+			return setMemo;
+		}, {});
+	}
 }

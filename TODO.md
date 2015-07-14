@@ -1,10 +1,14 @@
-- di &#10004;
-- Calculate equations &#10004;
-- Pre/post-processor &#10004;
-- Define equation sets and have a global index of them (somehow) &#10004;
-- <strike>Lazy load equation sets</strike>
-- Shareable equation sets (between node and browser?)
-- Plugins &#10004;
-- Web workers
-- <strike>Goal seek</strike>
-- <strike>Goal seek plugins</strike>
+- [x] di
+- [x] calculate
+- [x] inputs, optional inputs, calculations, outputs
+
+- [x] iterative calculations
+- [x] optionally calculated inputs
+
+- [ ] shareable equation sets
+- [ ] override default options
+
+- [ ] merge equation sets
+
+- [ ] pre/post processing
+- [ ] plugins

@@ -1,4 +1,4 @@
-import {$inject} from "../util/symbols";
+import {$inject} from "./symbols";
 
 export function annotate(fn) {
 	if (typeof fn == "function" && fn[$inject] instanceof Array) {
@@ -12,41 +12,49 @@ export function annotate(fn) {
 		return fn;
 	}
 
-	fn[$inject] = fn.toString().match(/^function .*?\((.*?)\)/)[1].split(/\s*,\s*/).filter((a) => a);
+	let matches = fn.toString().match(/^function(?: .*?| ?)\((.*?)\)\s?\{/);
+	if(!matches.length) {
+		matches = fn.toString().match(/^\((.*?)\)\s?=>\s?\{/);
+	}
+	fn[$inject] = matches[1].split(/\s*,\s*/).filter((a) => a);
 	return fn;
 }
 
-export function inject(fn, ...stores) {
-	if (!fn[$inject]) {
-		fn = annotate(fn);
+function injectInternals(sync, fn, ...stores) {
+	if(!fn[$inject]) {
+		annotate(fn);
 	}
-
-	// TODO: Support function argument destructure syntax with native, babel, and traceur
 
 	if(stores[0] instanceof Array) {
 		stores = stores[0];
 	}
 
-	let promises = fn[$inject].map((name) => {
-		// Replace this with "find" when that is ready
-		let injection = stores.reduceRight((item, store) => {
-			if(item !== undefined) {
-				return item;
-			}
-			return store[name];
-		}, undefined);
-
-		if (injection === undefined) {
+	let items = fn[$inject].map((name) => {
+		let foundStore = stores.find((store) => {
+			return store[name] !== undefined;
+		});
+		if (foundStore === undefined) {
 			throw new Error(`Cannot find dependency: ${name}`, fn);
 		}
-		return injection;
+		return foundStore[name];
 	});
 
-	return Promise.all(promises).then((args) => {
+	if(sync) {
+		return fn.apply(this, items);
+	}
+	return Promise.all(items).then((args) => {
 		return fn.apply(this, args);
 	});
 }
 
+export function inject(fn, ...stores) {
+	return injectInternals(false, fn, ...stores);
+}
+
+export function injectSync(fn, ...stores) {
+	return injectInternals(true, fn, ...stores);
+}
+
 export function isAnnotatable(fn) {
-	return (typeof fn == "function") || (fn instanceof Array && typeof fn[fn.length - 1] == "function");
+	return (typeof fn == "function") || (Array.isArray(fn) && typeof fn[fn.length - 1] == "function");
 }
