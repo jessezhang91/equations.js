@@ -1,35 +1,29 @@
 // import * as di from "../util/di";
 import {$inject} from "../util/symbols";
 import * as async from "../util/async";
-import * as di from "../util/di";
 import Equation from "./Equation";
 
 export default class EquationSet {
 	constructor({ options = {}, inputs = {}, calculations = {}, outputs = {} }) {
-		this.options = options;
-
-		// Initialize options
-		if(typeof this.options.iterative == "object" || this.options.iterative === true) {
-			let iterative = this.options.iterative = (this.options.iterative === true ? {} : this.options.iterative);
-			iterative.maxSteps = (iterative.maxSteps == null || Number.isNaN(iterative.maxSteps) ? 1e-6 : Number(iterative.maxSteps));
-			iterative.delta = (iterative.delta == null || Number.isNaN(iterative.delta) ? 1e-6 : Number(iterative.delta));
-		} else {
-			this.options.iterative = undefined;
-		}
+		this.options = parseOptions(options);
 
 		// Initialize sets
-		this.sets = {
-			inputs: parseSet(inputs),
-			calculations: parseSet(calculations),
-			outputs: parseSet(outputs)
-		};
+		this.sets = parseSets(inputs, calculations, outputs);
 
-		this.evaluationOrder = getEvaluationOrder(this.sets);
+		this.evaluationData = processSets(this.sets);
 	}
 
-	calculate(inputs, nonblocking = false) {
-		return calculateInternals.bind(this)(inputs, nonblocking);
+	calculate(inputs, options = {}, nonblocking = false) {
+		return calculateInternals.bind(this)(inputs, options, nonblocking);
 	}
+}
+
+function parseSets(inputs, calculations, outputs) {
+	return {
+		inputs: parseSet(inputs),
+		calculations: parseSet(calculations),
+		outputs: parseSet(outputs)
+	};
 }
 
 function parseSet(set) {
@@ -39,55 +33,97 @@ function parseSet(set) {
 	}, {});
 }
 
-function getEvaluationOrder(sets) {
-	let dependencies = Object.keys(sets).reduce((memo, setKey) => {
+function processSets(sets) {
+	let {dependencies, hasInitials} = Object.keys(sets).reduce((memo, setKey) => {
 		let set = sets[setKey];
 
 		Object.keys(set).forEach((key) => {
 			let equation = set[key];
-			memo[key] = (equation.value === undefined ? (equation.equation ? equation.equation[$inject] : []) : []);
+			memo.dependencies[key] = equation.equation ? equation.equation[$inject] : [];
+			memo.hasInitials[key] = equation.hasInitial;
 			return memo;
 		});
 
 		return memo;
-	}, {});
+	}, {
+		dependencies: {},
+		hasInitials: {}
+	});
 
-	let order = [];
-	let processedOutputs = new Set();
-	let processOutput = (key, set = new Set()) => {
-		if(processedOutputs.has(key)) {
+	let order = [],
+		circularInitials = {};
+
+	let processOutput = (key, path = [], allowCircular = false) => {
+		if (order.includes(key)) {
 			return;
 		}
 
 		let deps = dependencies[key];
-		if(!deps) {
+		if (!deps) {
 			throw new Error(`'${key}' not defined in equations set`);
 		}
-		if(set.has(key)) {
-			let path = Array.from(set.values()).join(" -> ") + " -> " + key;
-			throw new Error(`Output '${key}' has a circular dependency '${path}'`);
-		}
-		set.add(key);
 
+		allowCircular = allowCircular || hasInitials[key];
+
+		if (path.includes(key)) {
+			if (!allowCircular) {
+				let pathString = path.join(" -> ") + " -> " + key;
+				throw new Error(`Output '${key}' has a circular dependency '${pathString}'`);
+			}
+			path.forEach((pathKey) => {
+				if(hasInitials[pathKey]) {
+					circularInitials[pathKey] = true;
+				}
+			});
+			return;
+		}
+
+		path.push(key);
 		deps.forEach((dep) => {
-			if(dependencies[dep] == null) {
+			if (dependencies[dep] == null) {
 				throw new Error(`'${key}' has a missing dependency '${dep}'`);
 			}
-			processOutput(dep, new Set(set));
+			processOutput(dep, path.slice(), allowCircular);
 		});
-		processedOutputs.add(key);
-		order.push(key);
+
+		if (!order.includes(key)) {
+			order.push(key);
+		}
 	};
+
+
+	// Iterate through all dependencies
 	Object.keys(dependencies).forEach((key) => processOutput(key));
 
-	return order;
+	// Move circular initials to the front of order
+	order = order.filter(function (key) {
+		return !circularInitials[key];
+	});
+	order = Object.keys(circularInitials).concat(order);
+
+	return {
+		order,
+		circularInitials
+	};
 }
 
-function calculateInternals(inputs, nonblocking) {
-	let sets = this.sets,
-		evaluationOrder = this.evaluationOrder;
+function calculateInternals(inputs, optionOverrides = {}, nonblocking = false) {
+	// Get locals
+	let {
+			sets,
+			evaluationData: {
+				order,
+				circularInitials
+			}
+		} = this;
 
-	let inputKeys = new Set(Object.keys(sets.inputs));
+	// Destructure options
+	let {
+		iterative: {maxSteps, delta},
+		allowNaN
+	} = parseOptions(Object.assign({}, this.options, optionOverrides));
+
+	// Get all equations
 	let equations = Object.keys(sets).reduce((memo, setKey) => {
 		let set = sets[setKey];
 
@@ -97,19 +133,25 @@ function calculateInternals(inputs, nonblocking) {
 		return memo;
 	}, {});
 
-	// Get options
-	let maxSteps = 0, delta = 0;
-	if(this.options.iterative) {
-		let iterative = this.options.iterative;
-		maxSteps = iterative.maxSteps;
-		delta = iterative.delta;
-	}
-	let allowNaN = !!this.options.allowNaN;
-
 	// Get starting store
 	let store, storePromises;
-	storePromises = evaluationOrder.reduce((memo, key) => {
-		memo[key] = (inputs[key] !== undefined && inputKeys.has(key) ? inputs[key] : equations[key].value);
+	let inputKeys = new Set(Object.keys(sets.inputs));
+
+	// First step
+	storePromises = order.reduce((memo, key) => {
+		// If input is defined, use the input value. Otherwise, use the equation initial value
+		if(inputs[key] !== undefined && inputKeys.has(key)) {
+			memo[key] = inputs[key];
+			return memo;
+		}
+
+		let equation = equations[key];
+		if(equation.hasInitial) {
+			memo[key] = equation.initial;
+			return memo;
+		}
+
+		memo[key] = equation.evaluate(memo);
 		return memo;
 	}, {});
 
@@ -119,11 +161,15 @@ function calculateInternals(inputs, nonblocking) {
 	});
 
 	function step(n) {
-		storePromises = evaluationOrder.reduce((memo, key) => {
+		if (++n > maxSteps) {
+			return formatResult(store);
+		}
+
+		storePromises = order.reduce((memo, key) => {
 			let equation = equations[key];
-			if(equation.equation && (equation.value === undefined || n > 0)) {
+			if (equation.equation) {
 				// Use last iteration if value is not undefined, otherwise, use current store
-				memo[key] = di.inject(equation.equation, (equation.value === undefined ? memo : store));
+				memo[key] = equation.evaluate(circularInitials[key] ? store : memo);
 			} else {
 				memo[key] = store[key];
 			}
@@ -136,32 +182,32 @@ function calculateInternals(inputs, nonblocking) {
 				let prev = store[key],
 					curr = nextStore[key];
 
-				if(!allowNaN && Number.isNaN(curr)) {
+				if (!allowNaN && Number.isNaN(curr)) {
 					throw new Error(`${key} is NaN on step ${n}`);
 				}
 
 				// Matches
-				if(prev === curr) {
+				if (prev === curr) {
 					return false;
 				}
 
 				// Both are null or undefined
-				if(prev == null && curr == null) {
+				if (prev == null && curr == null) {
 					return false;
 				}
 
 				// One is null or undefined
-				if(prev == null || curr == null) {
+				if (prev == null || curr == null) {
 					return true;
 				}
 
 				// both NaN
-				if(Number.isNaN(prev) && Number.isNaN(curr)) {
+				if (Number.isNaN(prev) && Number.isNaN(curr)) {
 					return false;
 				}
 
 				// One is 0, check versus delta
-				if(prev === 0 || curr === 0) {
+				if (prev === 0 || curr === 0) {
 					return Math.abs((prev - curr) / Math.max(Math.abs(prev), Math.abs(curr))) >= delta;
 				}
 
@@ -172,7 +218,7 @@ function calculateInternals(inputs, nonblocking) {
 			store = nextStore;
 
 			let next = () => {
-				return (++n > maxSteps || !dirty) ? formatResult(store) : step.bind(this)(n);
+				return !dirty ? formatResult(store) : step.bind(this)(n);
 			};
 			return nonblocking ? new Promise((resolve) => setTimeout(() => resolve(next.bind(this)()))) : next();
 		});
@@ -189,4 +235,28 @@ function calculateInternals(inputs, nonblocking) {
 			return setMemo;
 		}, {});
 	}
+}
+
+function parseOptions(options) {
+	let out = Object.assign({}, options);
+
+	// Check iterative
+	if (out.iterative == null || !(typeof out.iterative == "object")) {
+		if (out.iterative === true) {
+			out.iterative = {
+				maxSteps: 100,
+				delta: 1e-6
+			};
+		} else {
+			out.iterative = {
+				maxSteps: 0,
+				delta: 0
+			};
+		}
+	}
+
+	// Check allowNaN
+	out.allowNaN = !!out.allowNaN;
+
+	return out;
 }

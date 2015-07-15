@@ -3,7 +3,7 @@ module.exports = function () {
 		options: {
 			iterative: {
 				maxSteps: 100,
-				delta: 0.02
+				delta: 1e-6
 			}
 		},
 		inputs: {
