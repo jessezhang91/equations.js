@@ -10,12 +10,13 @@ export default class EquationSet {
 		// Initialize sets
 		this.sets = parseSets(inputs, calculations, outputs);
 
-		this.evaluationOrder = getEvaluationOrder(this.sets);
+		this.dependencies = solveDependencies(this.sets);
 	}
 
 	calculate(inputs = {}, options = {}, nonblocking = false) {
-		return this.evaluationOrder.then((order) => {
-			return calculateInternals.bind(this)(order, inputs, options, nonblocking);
+		return this.dependencies.then((dependencies) => {
+			let {order, circularInitials} = dependencies;
+			return calculateInternals.bind(this)(order, circularInitials, inputs, options, nonblocking);
 		});
 	}
 }
@@ -35,7 +36,7 @@ function parseSet(set) {
 	}, {});
 }
 
-function getEvaluationOrder(sets) {
+function solveDependencies(sets) {
 	let {dependencies, hasInitials, deferrals} = Object.keys(sets).reduce((memo, setKey) => {
 		let set = sets[setKey];
 
@@ -59,9 +60,10 @@ function getEvaluationOrder(sets) {
 	});
 
 	// Find circular dependencies
-	let processedOutputs = [];
-	let processOutput = (key, path = []) => {
-		if (processedOutputs.includes(key) || hasInitials[key]) {
+	let processedOutputs = [],
+		circularInitials = {};
+	let findCircularDependencies = (key, path = [], allowCircular = false) => {
+		if (processedOutputs.includes(key)) {
 			return;
 		}
 
@@ -70,7 +72,17 @@ function getEvaluationOrder(sets) {
 			throw new Error(`'${key}' not defined in equations set`);
 		}
 
+		allowCircular = allowCircular || hasInitials[key];
+
 		if (path.includes(key)) {
+			if(allowCircular) {
+				path.filter((pathKey) => {
+					return hasInitials[pathKey];
+				}).forEach((pathKey) => {
+					circularInitials[pathKey] = true;
+				});
+				return;
+			}
 			let pathString = path.join(" -> ") + " -> " + key;
 			throw new Error(`Output '${key}' has a circular dependency '${pathString}'`);
 		}
@@ -80,21 +92,18 @@ function getEvaluationOrder(sets) {
 			if (dependencies[dep] == null) {
 				throw new Error(`'${key}' has a missing dependency '${dep}'`);
 			}
-			processOutput(dep, path.slice());
+			findCircularDependencies(dep, path.slice(), allowCircular);
 		});
 
 		processedOutputs.push(key);
 	};
 
-	// Iterate through all dependencies
-	Object.keys(dependencies).forEach((key) => processOutput(key));
-
-
-	// Find the order
+	// Iterate through all dependencies, find the evaluation order
 	let order = [],
 		promises = [];
-
 	Object.keys(dependencies).forEach((key) => {
+		findCircularDependencies(key);
+
 		let deps = dependencies[key].map((dep) => {
 			return deferrals[dep].promise;
 		});
@@ -109,11 +118,14 @@ function getEvaluationOrder(sets) {
 	});
 
 	return Promise.all(promises).then(() => {
-		return order;
+		return {
+			order,
+			circularInitials
+		};
 	});
 }
 
-function calculateInternals(order, inputs, optionOverrides = {}, nonblocking = false) {
+function calculateInternals(order, circularInitials, inputs, optionOverrides = {}, nonblocking = false) {
 	// Get locals
 	let sets = this.sets;
 
@@ -139,14 +151,17 @@ function calculateInternals(order, inputs, optionOverrides = {}, nonblocking = f
 
 	// First step
 	storePromises = order.reduce((memo, key) => {
+		let equation = equations[key];
+
 		// If input is defined, use the input value. Otherwise, use the equation initial value
-		if(inputs[key] !== undefined && inputKeys.has(key)) {
-			memo[key] = inputs[key];
-			return memo;
+		if(inputKeys.has(key)) {
+			memo[key] = inputs[key] !== undefined ? inputs[key] : equations[key].initial;
+			if(memo[key] !== undefined) {
+				return memo;
+			}
 		}
 
-		let equation = equations[key];
-		if(equation.hasInitial) {
+		if(circularInitials[key]) {
 			memo[key] = equation.initial;
 			return memo;
 		}
@@ -169,7 +184,7 @@ function calculateInternals(order, inputs, optionOverrides = {}, nonblocking = f
 			let equation = equations[key];
 			if (equation.equation) {
 				// Use last iteration if value is not undefined, otherwise, use current store
-				memo[key] = equation.evaluate(equation.hasInitial ? store : memo);
+				memo[key] = equation.evaluate(circularInitials[key] ? store : memo);
 			} else {
 				memo[key] = store[key];
 			}
