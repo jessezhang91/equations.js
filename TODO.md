@@ -12,3 +12,5 @@
 
 - [ ] pre/post processing
 - [ ] plugins
+
+- [ ] equation metadata (name, latex equation, units, etc.)
